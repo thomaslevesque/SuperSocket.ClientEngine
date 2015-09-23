@@ -16,9 +16,9 @@ namespace SuperSocket.ClientEngine.Proxy
             public SearchMarkState<byte> SearchState { get; set; }
         }
 
-        private const string m_RequestTemplate = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\nProxy-Connection: Keep-Alive\r\n\r\n";
+        private const string m_RequestTemplate = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\nProxy-Connection: Keep-Alive\r\n{2}\r\n";
 
-        private const string m_ResponsePrefix = "HTTP/1.1";
+        private const string m_ResponsePrefix = "HTTP/";
         private const char m_Space = ' ';
 
         private static byte[] m_LineSeparator;
@@ -96,16 +96,22 @@ namespace SuperSocket.ClientEngine.Proxy
                 e = new SocketAsyncEventArgs();
 
             string request;
+            string authorizationHeader = null;
+            string auth = Authorization;
+            if (auth != null)
+            {
+                authorizationHeader = string.Format("Proxy-Authorization: {0}\r\n", auth);
+            }
 
             if (targetEndPoint is DnsEndPoint)
             {
                 var targetDnsEndPoint = (DnsEndPoint)targetEndPoint;
-                request = string.Format(m_RequestTemplate, targetDnsEndPoint.Host, targetDnsEndPoint.Port);
+                request = string.Format(m_RequestTemplate, targetDnsEndPoint.Host, targetDnsEndPoint.Port, authorizationHeader);
             }
             else
             {
                 var targetIPEndPoint = (IPEndPoint)targetEndPoint;
-                request = string.Format(m_RequestTemplate, targetIPEndPoint.Address, targetIPEndPoint.Port);
+                request = string.Format(m_RequestTemplate, targetIPEndPoint.Address, targetIPEndPoint.Port, authorizationHeader);
             }
 
             var requestData = ASCIIEncoding.GetBytes(request);
@@ -185,7 +191,7 @@ namespace SuperSocket.ClientEngine.Proxy
 
             var httpProtocol = line.Substring(0, pos);
 
-            if (!m_ResponsePrefix.Equals(httpProtocol))
+            if (!httpProtocol.StartsWith(m_ResponsePrefix))
             {
                 OnException("protocol error: invalid protocol");
                 return;
@@ -209,5 +215,7 @@ namespace SuperSocket.ClientEngine.Proxy
 
             OnCompleted(new ProxyEventArgs(context.Socket));
         }
+
+        public string Authorization { get; set; }
     }
 }
